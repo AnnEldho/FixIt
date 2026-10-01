@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -13,12 +15,174 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController passwordController = TextEditingController();
 
   bool obscurePassword = true;
+  bool isLoading = false;
 
   @override
   void dispose() {
     emailController.dispose();
     passwordController.dispose();
     super.dispose();
+  }
+
+  // =========================
+  // FIREBASE LOGIN
+  // =========================
+
+  Future<void> loginUser() async {
+    final email = emailController.text.trim();
+    final password = passwordController.text.trim();
+
+    // Basic validation
+    if (email.isEmpty || password.isEmpty) {
+      showMessage('Please enter your email and password.');
+      return;
+    }
+
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      showMessage(
+        'Login successful!',
+        isError: false,
+      );
+
+      // Temporary screen until we build the actual dashboard.
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => const LoginSuccessScreen(),
+        ),
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      String message;
+
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+
+        case 'user-not-found':
+          message = 'No account found with this email.';
+          break;
+
+        case 'wrong-password':
+        case 'invalid-credential':
+          message = 'Incorrect email or password.';
+          break;
+
+        case 'user-disabled':
+          message = 'This account has been disabled.';
+          break;
+
+        case 'too-many-requests':
+          message = 'Too many attempts. Please try again later.';
+          break;
+
+        case 'network-request-failed':
+          message = 'Please check your internet connection.';
+          break;
+
+        default:
+          message = 'Login failed. Please try again.';
+      }
+
+      showMessage(message);
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        isLoading = false;
+      });
+
+      showMessage('Something went wrong. Please try again.');
+    }
+  }
+
+  // =========================
+  // FORGOT PASSWORD
+  // =========================
+
+  Future<void> resetPassword() async {
+    final email = emailController.text.trim();
+
+    if (email.isEmpty) {
+      showMessage('Enter your email address first.');
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(
+        email: email,
+      );
+
+      if (!mounted) return;
+
+      showMessage(
+        'Password reset email sent.',
+        isError: false,
+      );
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+
+      String message;
+
+      switch (e.code) {
+        case 'invalid-email':
+          message = 'Please enter a valid email address.';
+          break;
+
+        case 'user-not-found':
+          message = 'No account found with this email.';
+          break;
+
+        default:
+          message = 'Unable to send reset email.';
+      }
+
+      showMessage(message);
+    }
+  }
+
+  // =========================
+  // MESSAGE
+  // =========================
+
+  void showMessage(
+      String message, {
+        bool isError = true,
+      }) {
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: isError
+              ? Theme.of(context).colorScheme.error
+              : Theme.of(context).colorScheme.primary,
+        ),
+      );
   }
 
   @override
@@ -35,9 +199,9 @@ class _LoginScreenState extends State<LoginScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --------------------------------------------------
+              // =========================
               // LOGO
-              // --------------------------------------------------
+              // =========================
 
               Center(
                 child: Container(
@@ -87,9 +251,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 48),
 
-              // --------------------------------------------------
-              // WELCOME
-              // --------------------------------------------------
+              // =========================
+              // TITLE
+              // =========================
 
               Text(
                 'Welcome back!',
@@ -105,9 +269,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 30),
 
-              // --------------------------------------------------
+              // =========================
               // EMAIL
-              // --------------------------------------------------
+              // =========================
 
               Text(
                 'Email address',
@@ -132,9 +296,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 22),
 
-              // --------------------------------------------------
+              // =========================
               // PASSWORD
-              // --------------------------------------------------
+              // =========================
 
               Text(
                 'Password',
@@ -149,6 +313,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 controller: passwordController,
                 obscureText: obscurePassword,
                 textInputAction: TextInputAction.done,
+                onSubmitted: (_) => loginUser(),
                 decoration: InputDecoration(
                   hintText: 'Enter your password',
                   prefixIcon: const Icon(
@@ -171,14 +336,14 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 6),
 
-              // --------------------------------------------------
+              // =========================
               // FORGOT PASSWORD
-              // --------------------------------------------------
+              // =========================
 
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: isLoading ? null : resetPassword,
                   child: const Text(
                     'Forgot password?',
                   ),
@@ -187,17 +352,23 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 14),
 
-              // --------------------------------------------------
+              // =========================
               // LOGIN BUTTON
-              // --------------------------------------------------
+              // =========================
 
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // Login functionality will be added later.
-                  },
-                  child: const Row(
+                  onPressed: isLoading ? null : loginUser,
+                  child: isLoading
+                      ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                    ),
+                  )
+                      : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text('CONTINUE'),
@@ -213,9 +384,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 30),
 
-              // --------------------------------------------------
+              // =========================
               // DIVIDER
-              // --------------------------------------------------
+              // =========================
 
               Row(
                 children: [
@@ -239,9 +410,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 20),
 
-              // --------------------------------------------------
-              // CREATE ACCOUNT
-              // --------------------------------------------------
+              // =========================
+              // REGISTER
+              // =========================
 
               Center(
                 child: Row(
@@ -252,11 +423,14 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: theme.textTheme.bodyMedium,
                     ),
                     TextButton(
-                      onPressed: () {
+                      onPressed: isLoading
+                          ? null
+                          : () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const RegisterScreen(),
+                            builder: (context) =>
+                            const RegisterScreen(),
                           ),
                         );
                       },
@@ -270,15 +444,77 @@ class _LoginScreenState extends State<LoginScreen> {
 
               const SizedBox(height: 22),
 
-              // --------------------------------------------------
+              // =========================
               // FOOTER
-              // --------------------------------------------------
+              // =========================
 
               Center(
                 child: Text(
                   'FIXIT • Community Issue Resolution',
                   style: theme.textTheme.bodySmall,
                 ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ======================================================
+// TEMPORARY SUCCESS SCREEN
+// ======================================================
+// We will replace this with the real FixIt dashboard later.
+
+class LoginSuccessScreen extends StatelessWidget {
+  const LoginSuccessScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('FixIt'),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.check_circle_outline_rounded,
+                size: 80,
+                color: theme.colorScheme.primary,
+              ),
+              const SizedBox(height: 24),
+              Text(
+                'Login successful!',
+                style: theme.textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Welcome to FixIt.',
+                style: theme.textTheme.bodyMedium,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 35),
+              ElevatedButton(
+                onPressed: () async {
+                  await FirebaseAuth.instance.signOut();
+
+                  if (!context.mounted) return;
+
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                  );
+                },
+                child: const Text('LOG OUT'),
               ),
             ],
           ),
