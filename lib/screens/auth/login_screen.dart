@@ -1,6 +1,6 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import '../user/dashboard_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -63,7 +63,7 @@ class _LoginScreenState extends State<LoginScreen> {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const LoginSuccessScreen(),
+          builder: (context) => const DashboardScreen(),
         ),
       );
     } on FirebaseAuthException catch (e) {
@@ -462,64 +462,3 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
-// ======================================================
-// TEMPORARY SUCCESS SCREEN
-// ======================================================
-// We will replace this with the real FixIt dashboard later.
-
-class LoginSuccessScreen extends StatelessWidget {
-  const LoginSuccessScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('FixIt'),
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.check_circle_outline_rounded,
-                size: 80,
-                color: theme.colorScheme.primary,
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Login successful!',
-                style: theme.textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Welcome to FixIt.',
-                style: theme.textTheme.bodyMedium,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 35),
-              ElevatedButton(
-                onPressed: () async {
-                  await FirebaseAuth.instance.signOut();
-
-                  if (!context.mounted) return;
-
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const LoginScreen(),
-                    ),
-                  );
-                },
-                child: const Text('LOG OUT'),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
