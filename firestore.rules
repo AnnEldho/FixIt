@@ -1,0 +1,65 @@
+rules_version = '2';
+
+// FixIt security rules.
+// Publish: Firebase Console -> Firestore Database -> Rules -> paste -> Publish
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // Must match DefaultAdmin.email in lib/core/constants/app_constants.dart
+    function adminEmail() {
+      return 'admin@fixit.com';
+    }
+
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // ---------- users ----------
+    match /users/{uid} {
+      // Everyone can read their own profile; admins can read all.
+      allow read: if signedIn() && (request.auth.uid == uid || isAdmin());
+
+      // A user may create only their own profile.
+      //  - role 'user'  : always allowed
+      //  - role 'admin' : only for the built-in admin email (adminEmail())
+      allow create: if signedIn()
+        && request.auth.uid == uid
+        && (
+          request.resource.data.role == 'user'
+          || (
+            request.resource.data.role == 'admin'
+            && request.auth.token.email == adminEmail()
+          )
+        );
+
+      // Profile edits are allowed, but the role cannot be changed by the owner.
+      allow update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.role == resource.data.role;
+
+      allow delete: if false;
+    }
+
+    // ---------- issues ----------
+    match /issues/{issueId} {
+      allow read: if signedIn()
+        && (resource.data.reportedBy == request.auth.uid || isAdmin());
+
+      // Citizens can file reports for themselves, always starting as 'Reported'.
+      allow create: if signedIn()
+        && request.resource.data.reportedBy == request.auth.uid
+        && request.resource.data.status == 'Reported';
+
+      // Only admins can move an issue through its lifecycle.
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin();
+    }
+  }
+}
